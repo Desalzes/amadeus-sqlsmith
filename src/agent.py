@@ -1,14 +1,17 @@
+import json
+
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Message, TaskState, Part, TextPart
 from a2a.utils import get_message_text, new_agent_text_message
 
 from messenger import Messenger
+from sqlsmith import SQLSmithController
 
 
 class Agent:
     def __init__(self):
         self.messenger = Messenger()
-        # Initialize other state here
+        self.controller = SQLSmithController()
 
     async def run(self, message: Message, updater: TaskUpdater) -> None:
         """Implement your agent logic here.
@@ -21,12 +24,11 @@ class Agent:
         """
         input_text = get_message_text(message)
 
-        # Replace this example code with your agent logic
-
         await updater.update_status(
-            TaskState.working, new_agent_text_message("Thinking...")
+            TaskState.working, new_agent_text_message("Solving SQL task...")
         )
+        result = self.controller.solve(input_text)
         await updater.add_artifact(
-            parts=[Part(root=TextPart(text=input_text))],
-            name="Echo",
+            parts=[Part(root=TextPart(text=json.dumps(result, sort_keys=True)))],
+            name="sqlsmith-result",
         )

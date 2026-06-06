@@ -1,4 +1,5 @@
 from typing import Any
+import json
 import pytest
 import httpx
 from uuid import uuid4
@@ -197,3 +198,35 @@ async def test_message(agent, streaming):
     assert not all_errors, f"Message validation failed:\n" + "\n".join(all_errors)
 
 # Add your custom tests here
+
+@pytest.mark.asyncio
+async def test_sqlsmith_a2a_returns_sql_json_artifact(agent):
+    payload = json.dumps(
+        {
+            "task_id": "sqlite_count",
+            "question": "Count the total number of customers in the database",
+            "schema": {
+                "customers": ["id", "name", "email", "city", "phone", "created_at"],
+                "orders": ["id", "customer_id", "order_date", "total", "status"],
+            },
+            "dialect": "sqlite",
+        }
+    )
+
+    events = await send_text_message(payload, agent, streaming=False)
+
+    artifact_texts = []
+    for event in events:
+        if isinstance(event, tuple):
+            task, update = event
+            task_data = task.model_dump()
+            for artifact in task_data.get("artifacts") or []:
+                artifact_texts.extend(part["text"] for part in artifact.get("parts") or [])
+            if update and update.model_dump().get("kind") == "artifact-update":
+                parts = update.model_dump()["artifact"]["parts"]
+                artifact_texts.extend(part["root"]["text"] for part in parts)
+
+    assert artifact_texts
+    result = json.loads(artifact_texts[-1])
+    assert result["task_id"] == "sqlite_count"
+    assert result["sql"] == "SELECT COUNT(*) AS total FROM customers"

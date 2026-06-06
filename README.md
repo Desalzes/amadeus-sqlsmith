@@ -1,90 +1,94 @@
-# A2A Agent Template
+# Amadeus SQLSmith
 
-A minimal template for building [A2A (Agent-to-Agent)](https://a2a-protocol.org/latest/) agents.
+Amadeus SQLSmith is an AgentBeats purple agent specialized for Text-to-SQL
+benchmarks. It exposes an A2A HTTP service, accepts SQL task payloads, generates
+safe SELECT queries, validates identifiers with `sqlglot`, and returns the JSON
+shape expected by the public `ashcastelinocs124/text-2-sql-agent` green agent:
 
-## Project Structure
-
+```json
+{
+  "sql": "SELECT COUNT(*) AS total FROM customers",
+  "reasoning": "strategy=customer_count; validation=ok",
+  "task_id": "sqlite_count"
+}
 ```
+
+The v1 solver is SQLite-first and schema-aware. It has deterministic planners
+for common benchmark shapes, plus an optional OpenAI fallback when
+`OPENAI_API_KEY` is provided.
+
+## Layout
+
+```text
 src/
-├─ server.py      # Server setup and agent card configuration
-├─ executor.py    # A2A request handling
-├─ agent.py       # Your agent implementation goes here
-└─ messenger.py   # A2A messaging utilities
+  server.py             A2A server and agent card
+  executor.py           A2A SDK request handling
+  agent.py              Thin A2A adapter into SQLSmithController
+  messenger.py          Template A2A helper
+  sqlsmith/
+    task.py             Task parsing and SQL extraction
+    schema.py           Schema normalization
+    planner.py          Deterministic SQL candidates
+    validator.py        SELECT-only and identifier validation
+    llm.py              Optional OpenAI fallback
+    controller.py       Candidate orchestration and JSON result
 tests/
-└─ test_agent.py  # Agent tests
-Dockerfile            # Docker configuration
-pyproject.toml        # Python dependencies
-amber-manifest.json5  # Amber manifest
-.github/
-└─ workflows/
-   └─ test-and-publish.yml # CI workflow
+  test_agent.py         A2A conformance and SQL artifact smoke
+  test_sqlsmith_*.py    Unit tests for the solver core
 ```
 
-## Getting Started
+## Local Setup
 
-1. **Create your repository** - Click "Use this template" to create your own repository from this template
-
-2. **Implement your agent** - Add your agent logic to [`src/agent.py`](src/agent.py)
-
-3. **Configure your agent card** - Fill in your agent's metadata (name, skills, description) in [`src/server.py`](src/server.py)
-
-4. **Fill out your [Amber](https://github.com/RDI-Foundation/amber) manifest** - Update [`amber-manifest.json5`](amber-manifest.json5) to use your agent in Amber scenarios
-
-5. **Write your tests** - Add custom tests for your agent in [`tests/test_agent.py`](tests/test_agent.py)
-
-For a concrete example of implementing an agent using this template, see this [draft PR](https://github.com/RDI-Foundation/agent-template/pull/8).
-
-## Running Locally
-
-```bash
-# Install dependencies
-uv sync
-
-# Run the server
-uv run src/server.py
-```
-
-## Running with Docker
-
-```bash
-# Build the image
-docker build -t my-agent .
-
-# Run the container
-docker run -p 9009:9009 my-agent
-```
-
-## Testing
-
-Run A2A conformance tests against your agent.
-
-```bash
-# Install test dependencies
+```powershell
 uv sync --extra test
-
-# Start your agent (uv or docker; see above)
-
-# Run tests against your running agent URL
-uv run pytest --agent-url http://localhost:9009
+uv run pytest -q tests/test_sqlsmith_task.py tests/test_sqlsmith_schema.py tests/test_sqlsmith_planner.py tests/test_sqlsmith_validator.py tests/test_sqlsmith_controller.py
 ```
 
-## Publishing
+Run the A2A service:
 
-The repository includes a GitHub Actions workflow that automatically builds, tests, and publishes a Docker image of your agent to GitHub Container Registry.
-
-If your agent needs API keys or other secrets, add them in Settings → Secrets and variables → Actions → Repository secrets. They'll be available as environment variables during CI tests.
-
-- **Push to `main`** → publishes `latest` tag:
-```
-ghcr.io/<your-username>/<your-repo-name>:latest
+```powershell
+uv run python src/server.py --host 127.0.0.1 --port 9009
 ```
 
-- **Create a git tag** (e.g. `git tag v1.0.0 && git push origin v1.0.0`) → publishes version tags:
-```
-ghcr.io/<your-username>/<your-repo-name>:1.0.0
-ghcr.io/<your-username>/<your-repo-name>:1
+In another shell, run the live A2A conformance tests:
+
+```powershell
+uv run pytest -q tests/test_agent.py --agent-url http://127.0.0.1:9009
 ```
 
-Once the workflow completes, find your Docker image in the Packages section (right sidebar of your repository). Configure the package visibility in package settings.
+## Configuration
 
-> **Note:** Organization repositories may need package write permissions enabled manually (Settings → Actions → General). Version tags must follow [semantic versioning](https://semver.org/) (e.g., `v1.0.0`).
+Environment variables:
+
+- `OPENAI_API_KEY` - optional. Enables LLM fallback when the deterministic
+  planner does not have a high-confidence candidate.
+- `SQLSMITH_OPENAI_MODEL` - optional. Defaults to `gpt-5-mini`.
+
+The deterministic planner and tests do not require network access or API keys.
+
+## Docker
+
+```powershell
+docker build -t amadeus-sqlsmith .
+docker run --rm -p 9009:9009 amadeus-sqlsmith
+```
+
+The AgentBeats manifest points at:
+
+```text
+ghcr.io/desalzes/amadeus-sqlsmith:latest
+```
+
+Change `amber-manifest.json5` if publishing under a different GitHub owner or
+repository name.
+
+## AgentBeats
+
+1. Publish the Docker image to a public registry.
+2. Register a purple agent on AgentBeats with the image and repository URL.
+3. Submit it against `ashcastelinocs124/text-2-sql-agent`.
+4. For local leaderboard testing, use the AgentBeats tutorial flow with
+   `scenario.toml` and `generate_compose.py`.
+
+This repo does not auto-submit paid or public assessments. Registration and
+submission are operator-controlled.

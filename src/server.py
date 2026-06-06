@@ -24,20 +24,23 @@ def main():
     # See: https://a2a-protocol.org/latest/tutorials/python/3-agent-skills-and-card/
     
     skill = AgentSkill(
-        id="",
-        name="",
-        description="",
-        tags=[],
-        examples=[]
+        id="text_to_sql",
+        name="Text-to-SQL",
+        description="Generate safe SQL queries from natural-language questions and schemas.",
+        tags=["sql", "text-to-sql", "agentbeats"],
+        examples=["Count customers", "Find orders between 50 and 200"],
     )
 
     agent_card = AgentCard(
-        name="",
-        description="",
+        name="Amadeus SQLSmith",
+        description=(
+            "A Text-to-SQL purple agent with schema-aware planning, validation, "
+            "and optional LLM fallback."
+        ),
         url=args.card_url or f"http://{args.host}:{args.port}/",
         version='1.0.0',
-        default_input_modes=['text'],
-        default_output_modes=['text'],
+        default_input_modes=['text', 'application/json'],
+        default_output_modes=['text', 'application/json'],
         capabilities=AgentCapabilities(streaming=True),
         skills=[skill]
     )
