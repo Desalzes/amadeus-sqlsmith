@@ -13,6 +13,13 @@ from a2a.types import (
 from executor import Executor
 
 
+def advertised_agent_url(host: str, port: int, card_url: str | None) -> str:
+    if card_url:
+        return card_url
+    advertised_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    return f"http://{advertised_host}:{port}/"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the A2A agent.")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind the server")
@@ -37,7 +44,7 @@ def main():
             "A Text-to-SQL purple agent with schema-aware planning, validation, "
             "and optional LLM fallback."
         ),
-        url=args.card_url or f"http://{args.host}:{args.port}/",
+        url=advertised_agent_url(args.host, args.port, args.card_url),
         version='1.0.0',
         default_input_modes=['text', 'application/json'],
         default_output_modes=['text', 'application/json'],
